@@ -112,10 +112,15 @@
 // Mention and list name
 //
 
-#define TWUValidMentionPrecedingChars   @"(?:[^a-z0-9_!#$%&*@＠]|^|(?:^|[^a-z0-9_+~.-])RT:?)"
+#define TWUValidMentionPrecedingChars   @"(?:^|\\s+)" //@"(?:[^a-z0-9_!#$%&*@＠]|^|(?:^|[^a-z0-9_+~.-])RT:?)"
 #define TWUAtSigns                      @"[@＠]"
 #define TWUValidUsername                @"\\A" TWUAtSigns @"[a-z0-9_]{1,20}\\z"
 #define TWUValidList                    @"\\A" TWUAtSigns @"[a-z0-9_]{1,20}/[a-z][a-z0-9_\\-]{0,24}\\z"
+
+#define TWUValidMention \
+    @"(?:^|[" TWUUnicodeSpaces @"]|[" @"!\"#$%&'\\(\\)*+,/:;<=>?@\\[\\]^`\\{|}~" @"])" \
+    @"(" TWUAtSigns @")([a-z0-9_\\-.]{1,30})" \
+    @"(?:^||\\s+)"
 
 #define TWUValidMentionOrList \
     @"(" TWUValidMentionPrecedingChars @")" \
@@ -360,6 +365,79 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
 
 #pragma mark - Public Methods
 
++ (NSAttributedString *)shpply_parsedAttributedStringInText:(NSString *)text
+                                             usernamesColor:(UIColor *)usernamesColor
+                                              hashtagsColor:(UIColor *)hashtagsColor
+                                                 linksColor:(UIColor *)linksColor
+{
+    NSMutableAttributedString *result = [[NSMutableAttributedString alloc] initWithString:text];
+    
+    for (TwitterTextEntity *entity in [self shpply_entitiesInText:text]) {
+        switch (entity.type) {
+            case TwitterTextEntityHashtag:
+                [result addAttributes:@{
+                    kHashtagKeyName: @"",
+                    NSForegroundColorAttributeName: hashtagsColor,
+                    NSStrokeColorAttributeName: [UIColor clearColor]
+                } range:entity.range];
+                break;
+            case TwitterTextEntityScreenName:
+                [result addAttributes:@{
+                    kUsernameKeyName: @"",
+                    NSForegroundColorAttributeName: usernamesColor,
+                    NSStrokeColorAttributeName: [UIColor clearColor]
+                } range:entity.range];
+                break;
+            case TwitterTextEntityURL:
+                [result addAttributes:@{
+                    NSLinkAttributeName: @"",
+                    NSForegroundColorAttributeName: linksColor,
+                    NSStrokeColorAttributeName: linksColor
+                } range:entity.range];
+                break;;
+            default:
+                break;
+        }
+    }
+    
+    return result;
+}
+
++ (NSArray<TwitterTextEntity *> *)shpply_entitiesInText:(NSString *)text {
+    if (!text.length) {
+        return @[];
+    }
+
+    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
+
+    NSArray<TwitterTextEntity *> *urls = [self URLsInText:text];
+    [results addObjectsFromArray:urls];
+
+    NSArray<TwitterTextEntity *> *hashtags = [self hashtagsInText:text withURLEntities:urls];
+    [results addObjectsFromArray:hashtags];
+
+    NSArray<TwitterTextEntity *> *mentionsAndLists = [self mentionsInText:text];
+    NSMutableArray<TwitterTextEntity *> *addingItems = [NSMutableArray<TwitterTextEntity *> array];
+
+    for (TwitterTextEntity *entity in mentionsAndLists) {
+        NSRange entityRange = entity.range;
+        BOOL found = NO;
+        for (TwitterTextEntity *existingEntity in results) {
+            if (NSIntersectionRange(existingEntity.range, entityRange).length > 0) {
+                found = YES;
+                break;
+            }
+        }
+        if (!found) {
+            [addingItems addObject:entity];
+        }
+    }
+
+    [results addObjectsFromArray:addingItems];
+
+    return results;
+}
+
 + (NSArray<TwitterTextEntity *> *)entitiesInText:(NSString *)text
 {
     if (!text.length) {
@@ -598,6 +676,39 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
         if (entity.type == TwitterTextEntityScreenName) {
             [results addObject:entity];
         }
+    }
+
+    return results;
+}
+
++ (NSArray<TwitterTextEntity *> *)mentionsInText:(NSString *)text
+{
+    if (!text.length) {
+        return @[];
+    }
+
+    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
+    NSUInteger len = text.length;
+    NSUInteger position = 0;
+
+    while (1) {
+        NSTextCheckingResult *matchResult = [[self validMentionRegexp] firstMatchInString:text options:NSMatchingWithoutAnchoringBounds range:NSMakeRange(position, len - position)];
+        if (!matchResult || matchResult.numberOfRanges < 3) {
+            break;
+        }
+
+        NSRange allRange = matchResult.range;
+        NSUInteger end = NSMaxRange(allRange);
+
+        NSRange atSignRange = [matchResult rangeAtIndex:1];
+        NSRange screenNameRange = [matchResult rangeAtIndex:2];
+
+        TwitterTextEntity *entity = [TwitterTextEntity entityWithType:TwitterTextEntityScreenName
+                                                                range:NSMakeRange(atSignRange.location,
+                                                                                  NSMaxRange(screenNameRange) - atSignRange.location)];
+        [results addObject:entity];
+
+        position = end;
     }
 
     return results;
@@ -925,6 +1036,16 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidMentionOrList options:NSRegularExpressionCaseInsensitive error:NULL];
+    });
+    return regexp;
+}
+
++ (NSRegularExpression *)validMentionRegexp
+{
+    static NSRegularExpression *regexp;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidMention options:NSRegularExpressionCaseInsensitive error:NULL];
     });
     return regexp;
 }

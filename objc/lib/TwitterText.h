@@ -10,7 +10,15 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+NSString * const kHashtagKeyName = @"Hashtag";
+NSString * const kUsernameKeyName = @"Username";
+
 @interface TwitterText : NSObject
+
++ (NSAttributedString *)shpply_parsedAttributedStringInText:(NSString *)text
+                                             usernamesColor:(UIColor *)usernamesColor
+                                              hashtagsColor:(UIColor *)hashtagsColor
+                                                 linksColor:(UIColor *)linksColor;
 
 + (NSArray<TwitterTextEntity *> *)entitiesInText:(NSString *)text;
 + (NSArray<TwitterTextEntity *> *)URLsInText:(NSString *)text;
