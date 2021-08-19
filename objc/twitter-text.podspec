@@ -20,7 +20,7 @@ Pod::Spec.new do |s|
                        DESC
   s.homepage = "#{url}/tree/#{tag}/objc"
 
-  s.source = { :git => "#{url}.git", :tag => tag }
+  s.source = { :git => "#{url}.git", :branch => "uniweb" }
   s.source_files = 'objc/lib/*.{h,m}', 'objc/ThirdParty/IFUnicodeURL/IFUnicodeURL/*.{h,m}', 'objc/ThirdParty/IFUnicodeURL/IFUnicodeURL/IDNSDK/**/*.{h,m,c}'
   s.public_header_files = 'objc/lib/TwitterText.h', 'objc/lib/TwitterTextEntity.h'
   s.header_mappings_dir = 'objc'
