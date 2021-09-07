@@ -19,6 +19,7 @@ NSString * const kUsernameKeyName = @"Username";
                                              usernamesColor:(UIColor *)usernamesColor
                                               hashtagsColor:(UIColor *)hashtagsColor
                                                  linksColor:(UIColor *)linksColor;
++ (NSArray<TwitterTextEntity *> *)shpply_entitiesInText:(NSString *)text;
 
 + (NSArray<TwitterTextEntity *> *)entitiesInText:(NSString *)text;
 + (NSArray<TwitterTextEntity *> *)URLsInText:(NSString *)text;
